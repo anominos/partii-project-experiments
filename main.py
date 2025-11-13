@@ -28,7 +28,8 @@ def generate_module(n: int) -> ModuleOp:
 
 def main():
     module = generate_module(16)
-    print(module)
+    with open("build/mlir/module.mlir", "w") as f:
+        print(module, file=f)
     passes = PassPipeline(
         (
             convert_arith_to_riscv.ConvertArithToRiscvPass(),
