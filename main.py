@@ -40,7 +40,7 @@ def main():
     ctx = Context()
     passes.apply(ctx, module)
     print(module)
-    riscv_allocate_registers.RISCVAllocateRegistersPass(allow_infinite=True).apply(ctx, module)
+    riscv_allocate_registers.RISCVAllocateRegistersPass().apply(ctx, module)
     print(module)
 
 
