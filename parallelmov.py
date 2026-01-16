@@ -17,20 +17,22 @@ ctx = Context()
 ctx.load_dialect(RISCV)
 
 
-inps = [R.UNALLOCATED_INT, R.UNALLOCATED_INT, R.UNALLOCATED_INT]
-outs = [R.UNALLOCATED_INT, R.UNALLOCATED_INT, R.UNALLOCATED_INT]
+# inps = [R.UNALLOCATED_INT, R.UNALLOCATED_INT, R.UNALLOCATED_INT]
+# outs = [R.UNALLOCATED_INT, R.T0, R.UNALLOCATED_INT]
+inps = [R.FT0, R.FT1, R.FT2]
+outs = [R.FT3, R.FT4, R.FT5]
 free_reg = ArrayAttr([R.S9, R.S10,R.S11, R.FS10])
 assert len(inps) == len(outs)
 
 l: list[Operation] = [TestOp([], inps)]
 
-# l.append(ParallelMovOp(
-#     l[0].results,
-#     outs,
-#     free_registers=free_reg
-# ))
+l.append(ParallelMovOp(
+    l[0].results,
+    outs,
+    free_registers=free_reg
+))
 
-l.append(AddOp(l[-1].results[0], l[-1].results[1]))
+# l.append(AddOp(l[-1].results[0], l[-1].results[1]))
 
 l.append(TestOp(l[-1].results, []))
 l.append(ReturnOp())
@@ -51,8 +53,8 @@ print("---END ALLOCATING---", file=sys.stderr)
 print(module, file=sys.stderr)
 
 
-# print("-----LOWERING-----", file=sys.stderr)
-# riscv_lower_parallel_mov.RISCVLowerParallelMovPass().apply(None, module)
-# print("---END LOWERING---", file=sys.stderr)
+print("-----LOWERING-----", file=sys.stderr)
+riscv_lower_parallel_mov.RISCVLowerParallelMovPass().apply(None, module)
+print("---END LOWERING---", file=sys.stderr)
 
-# print(module)
+print(module)
