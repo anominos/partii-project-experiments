@@ -1,35 +1,24 @@
-func.func public @pooling_nchw_max_d1_s2_3x3(
-    %X: memref<1x1x18x18xf64>,
-    %Y: memref<1x1x8x8xf64>
-) -> () {
-    %min_val = arith.constant -10000 : f64
-    linalg.generic {
-        indexing_maps = [
-            affine_map<(d0, d1, d2, d3) -> ()>,
-            affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
-        ],
-        iterator_types = ["parallel", "parallel", "parallel", "parallel"]
-    } ins(%min_val : f64) outs(%Y : memref<1x1x8x8xf64>) {
-    ^bb0(%in: f64, %out: f64):
-        linalg.yield %in : f64
+// riscv_func.func @main() {
+//   %0 = riscv.li 6 : !riscv.reg
+//   %1 = riscv.li 5 : !riscv.reg<s0>
+//   %5 = riscv.add %0, %1 : (!riscv.reg, !riscv.reg<s0>) -> !riscv.reg
+//   %7 = riscv_scf.for %8 : !riscv.reg = %0 to  %1 step %5 iter_args(%9 = %5) -> (!riscv.reg) {
+//     %10 = riscv.mv %9 : (!riscv.reg) -> !riscv.reg
+//     riscv_scf.yield %10 : !riscv.reg
+//   }
+//   riscv_func.return
+// }
+
+builtin.module {
+  riscv_func.func @main() {
+    %0 = riscv.li 6 : !riscv.reg<j_1>
+    %1 = riscv.li 5 : !riscv.reg<s0>
+    %2 = riscv.add %0, %1 : (!riscv.reg<j_1>, !riscv.reg<s0>) -> !riscv.reg<j_0>
+    %3 = riscv_scf.for %4 : !riscv.reg<j_1>  = %0 to %1 step %2 iter_args(%5 = %2) -> (!riscv.reg<j_0>) {
+      // riscv.mv %4 : (!riscv.reg<j_1>) -> !riscv.reg<zero>
+      %6 = riscv.mv %5 : (!riscv.reg<j_0>) -> !riscv.reg<j_0>
+      riscv_scf.yield %6 : !riscv.reg<j_0>
     }
-    %alloc = memref.alloc() {alignment = 64 : i64} : memref<3x3xf32>
-    linalg.generic {
-      bounds = [#builtin.int<1>, #builtin.int<1>, #builtin.int<7>, #builtin.int<7>, #builtin.int<3>, #builtin.int<3>],
-      indexing_maps = [
-        affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2 * 2 + d4, d3 * 2 + d5)>,
-        affine_map<(d0, d1, d2, d3, d4, d5) -> (d4, d5)>,
-        affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
-      ],
-      iterator_types = ["parallel", "parallel", "parallel", "parallel", "reduction", "reduction"]
-    } ins(%X, %alloc : memref<1x1x18x18xf64>, memref<3x3xf32>) outs(%Y : memref<1x1x8x8xf64>) {
-    ^bb0(%x : f64, %alloc_val: f64, %acc : f64):
-      %res = arith.maximumf %x, %acc : f64
-      linalg.yield %res : f64
-    }
-    memref.dealloc %alloc : memref<3x3xf32>
-    func.return
+    riscv_func.return
   }
-
-
-
+}
