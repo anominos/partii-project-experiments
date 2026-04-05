@@ -1,0 +1,20 @@
+Register Allocation by Optimal Graph Coloring
+Christian Andersson
+
+register allocation as graph colouring
+- node = value
+- edge = live range interference between values
+colour this graph (with least colours) = regalloc -> np complete
+
+use greedy algorithm:
+given chromatic number k:
+- find node with less than k neighbours, push to stack
+- repeat
+- if no such node, spill arbitrary registers, recalculate interference graph and start again
+
+
+Register Allocation for Programs in SSA-Form
+Sebastian Hack, Daniel Grund, and Gerhard Goos
+
+- describes spilling problem as separate to determining the chromatic number of IG
+- colouring is trivial because graph is chordal, so greedy will work.

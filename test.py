@@ -2,20 +2,21 @@ from xdsl.dialects import riscv
 from xdsl.dialects.test import TestOp
 from xdsl.dialects.riscv.registers import Registers as R
 from xdsl.dialects.riscv.ops import AddOp
+from xdsl.dialects.rv32 import LiOp
 from xdsl.dialects.builtin import ModuleOp, ArrayAttr, Operation, SSAValue, Attribute, Region, Block
 from xdsl.dialects.riscv_func import FuncOp, ReturnOp
 
 from xdsl.backend.register_stack import OutOfRegisters
 from xdsl.backend.riscv.register_stack import RiscvRegisterStack
-from xdsl.transforms import riscv_allocate_registers, riscv_allocate_infinite_registers
+from xdsl.transforms import riscv_allocate_registers, riscv_allocate_infinite_registers, riscv_lower_parallel_mov, riscv_allocate_registers_spilling
 from xdsl.passes import PassPipeline
 
 inps = [R.UNALLOCATED_INT for _ in range(5)]
 free_reg = (R.T0, R.T1, R.T2, R.T3)
 
 l: list[Operation] = []
-for x in inps:
-    l.append(TestOp(result_types=[x]))
+for i, x in enumerate(inps):
+    l.append(LiOp(i+1, rd=x))
 vals = l[:]
 
 l.append(AddOp(vals[0], vals[1]))
@@ -31,12 +32,23 @@ moduleop = ModuleOp([FuncOp("main", l, ([], []))])
 print(moduleop)
 RiscvRegisterStack.DEFAULT_ALLOCATABLE_REGISTERS = free_reg
 
-riscv_allocate_registers.RISCVAllocateRegistersPass(force_infinite=True).apply(None, moduleop)
 
-riscv_allocate_infinite_registers.RISCVAllocateInfiniteRegistersPass().apply(None, moduleop)
+riscv_allocate_registers_spilling.SpillPass().apply(None, moduleop)
+riscv_allocate_registers_spilling.ResolveSpillingOps().apply(None, moduleop)
 print(moduleop)
-print()
-riscv_allocate_infinite_registers.ResolveVirtualRegisters().apply(None, moduleop)
+# riscv_allocate_registers_spilling.SpillPass().apply(None, moduleop)
+# riscv_allocate_registers_spilling.ResolveSpillingOps().apply(None, moduleop)
+# print(moduleop)
+
+riscv_allocate_registers.RISCVAllocateRegistersPass().apply(None, moduleop)
+
+# riscv_allocate_infinite_registers.RISCVAllocateInfiniteRegistersPass().apply(None, moduleop)
+# print(moduleop)
+# print()
+# riscv_allocate_infinite_registers.ResolveVirtualRegisters().apply(None, moduleop)
+# print(moduleop)
+# print()
+# riscv_lower_parallel_mov.RISCVLowerParallelMovPass().apply(None, moduleop)
 print(moduleop)
 
 """
