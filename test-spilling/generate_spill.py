@@ -1,9 +1,10 @@
-from xdsl.backend.riscv.lowering import convert_arith_to_riscv, convert_func_to_riscv_func, convert_memref_to_riscv
+from xdsl.backend.riscv.lowering import convert_arith_to_riscv, convert_func_to_riscv_func
+
 from xdsl.transforms import reconcile_unrealized_casts
 from xdsl.context import Context
 from xdsl.dialects.builtin import ModuleOp, IndexType
 from xdsl.dialects import arith, func
-from xdsl.ir import Block, Region
+from xdsl.ir import Block, Operation, Region
 from xdsl.passes import PassPipeline
 from xdsl.transforms import riscv_allocate_registers
 
@@ -11,7 +12,7 @@ from xdsl.transforms import riscv_allocate_registers
 def generate_module(n: int) -> ModuleOp:
     extern_func = func.FuncOp("foo", ([], [IndexType()]), Region(), visibility="private")
 
-    calls = [func.CallOp("foo", [], [IndexType()]) for _ in range(n)]
+    calls: list[Operation] = [func.CallOp("foo", [], [IndexType()]) for _ in range(n)]
     calls.append(arith.AddiOp(calls[0], calls[1]))
     for i in range(n-2):
         calls.append(arith.AddiOp(calls[-1], calls[i+2]))
@@ -40,8 +41,9 @@ def main():
     ctx = Context()
     passes.apply(ctx, module)
     print(module)
-    riscv_allocate_registers.RISCVAllocateRegistersPass().apply(ctx, module)
-    print(module)
+
+    # riscv_allocate_registers.RISCVAllocateRegistersPass().apply(ctx, module)
+    # print(module)
 
 
 if __name__ == "__main__":
