@@ -1,35 +1,36 @@
 from xdsl.backend.riscv.lowering import convert_arith_to_riscv, convert_func_to_riscv_func
-
+from xdsl.dialects.riscv import stack as riscv_stack
 from xdsl.transforms import reconcile_unrealized_casts
 from xdsl.context import Context
 from xdsl.dialects.builtin import ModuleOp, IndexType
-from xdsl.dialects import arith, func
+from xdsl.dialects import arith, func, builtin, test, riscv
 from xdsl.ir import Block, Operation, Region
 from xdsl.passes import PassPipeline
-from xdsl.transforms import riscv_allocate_registers
+from xdsl.transforms import riscv_allocate_registers, riscv_allocate_infinite_registers, test_riscv_spilling, riscv_legalize_parallel_mov, riscv_reorder_infinite, riscv_lower_parallel_mov
 
 
 def generate_module(n: int) -> ModuleOp:
-    extern_func = func.FuncOp("foo", ([], [IndexType()]), Region(), visibility="private")
+    extern_func = func.FuncOp("foo", ([], [builtin.Float32Type()]), Region(), visibility="private")
 
-    calls: list[Operation] = [func.CallOp("foo", [], [IndexType()]) for _ in range(n)]
-    calls.append(arith.AddiOp(calls[0], calls[1]))
-    for i in range(n-2):
-        calls.append(arith.AddiOp(calls[-1], calls[i+2]))
+    calls: list[Operation] = [func.CallOp("foo", [], [builtin.Float32Type()]) for _ in range(n)]
+    # calls: list[Operation] = [test.TestOp(result_types = [builtin.Float32Type()]) for _ in range(n)]
+    calls.append(arith.AddfOp(calls[-1], calls[-2]))
+    for i in range(1,n-1):
+        calls.append(arith.AddfOp(calls[-1], calls[n-i-2]))
 
     calls.append(func.ReturnOp(calls[-1]))
 
     block = Block(calls)
     region = Region(block)
 
-    pressure_func = func.FuncOp("reg_pressure", ([], [IndexType()]), region=region)
+    pressure_func = func.FuncOp("reg_pressure", ([], [builtin.Float32Type()]), region=region)
 
     return ModuleOp([extern_func, pressure_func])
 
 
-def main():
-    module = generate_module(16)
-    with open("build/mlir/module.mlir", "w") as f:
+def do_spill(n: int):
+    module = generate_module(n)
+    with open("build/arith-module.mlir", "w") as f:
         print(module, file=f)
     passes = PassPipeline(
         (
@@ -40,14 +41,49 @@ def main():
     )
     ctx = Context()
     passes.apply(ctx, module)
-    print(module)
+    with open("build/riscv-module.mlir", "w") as f:
+        print(module, file=f)
 
-    # riscv_allocate_registers.RISCVAllocateRegistersPass().apply(ctx, module)
-    # print(module)
+    test_riscv_spilling.TestRiscvSpillingPass().apply(ctx, module)
 
+    with open("build/riscv-module-spilt.mlir", "w") as f:
+        print(module, file=f)
+
+    riscv_legalize_parallel_mov.RISCVLegalizeParallelMovPass().apply(ctx, module)
+    riscv_allocate_registers.RISCVAllocateRegistersPass(force_infinite=True).apply(ctx, module)
+    riscv_reorder_infinite.RISCVReorderInfinitePass().apply(ctx, module)
+    riscv_allocate_infinite_registers.RISCVAllocateInfiniteRegistersPass().apply(ctx, module)
+
+    riscv_lower_parallel_mov.RISCVLowerParallelMovPass().apply(ctx, module)
+    # with open("build/riscv-module-allocated.mlir", "w") as f:
+    #     print(module, file=f)
+    return module
 
 if __name__ == "__main__":
-    main()
+    ns = []
+    mem_counts = []
+    for i in range(3, 75):
+        module = do_spill(i)
+        mem_ops = 0
+        for op in module.walk():
+            if isinstance(op, (riscv_stack.LoadOp, riscv_stack.StoreOp)):
+                mem_ops += 1
+
+        ns.append(i)
+        mem_counts.append(mem_ops)
+
+    import matplotlib.pyplot as plt
+    plt.plot(ns, mem_counts)
+    plt.xlabel("Number of live values")
+    plt.ylabel("Memory operations used")
+    plt.title("Memory operations used against live values")
+    # Enable minor ticks to allow for a finer grid
+    plt.minorticks_on()
+
+    # Customize the major grid (the primary lines)
+    plt.grid(visible=True, which='major', color='#666666', linestyle='-', alpha=0.6)
+
+    plt.savefig("build/test-spilling.svg")
 
 """
 extern int foo();
