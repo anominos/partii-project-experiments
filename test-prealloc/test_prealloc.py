@@ -122,7 +122,10 @@ plt.title("Registers used against percentage of preallocated registers in input"
 # Enable minor ticks to allow for a finer grid
 plt.minorticks_on()
 plt.legend()
-
+plt.gca().set_ylim(bottom=0)
+plt.gca().set_xlim(left=0)
+plt.gca().spines['top'].set_visible(False)
+plt.gca().spines['right'].set_visible(False)
 # Customize the major grid (the primary lines)
 plt.grid(visible=True, which='major', color='#666666', linestyle='-', alpha=0.6)
 
